@@ -21,12 +21,10 @@ const PORT = process.env.PORT || 3005;
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', service: 'event-service' });
 });
 
-// Get all events with optional filters
 app.get('/events', async (req, res) => {
   try {
     const { sport, status, limit = 50, offset = 0 } = req.query;
@@ -71,12 +69,10 @@ app.get('/events', async (req, res) => {
   }
 });
 
-// Get single event with markets and selections
 app.get('/events/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Get event
     const eventResult = await query(
       `SELECT id, sport, name, home_team, away_team, start_time, status, created_at
        FROM events WHERE id = $1`,
@@ -94,7 +90,6 @@ app.get('/events/:id', async (req, res) => {
 
     const event: SportEvent = eventResult.rows[0];
 
-    // Get markets for this event
     const marketsResult = await query(
       `SELECT id, event_id, name, type, status, created_at
        FROM markets WHERE event_id = $1`,
@@ -104,7 +99,6 @@ app.get('/events/:id', async (req, res) => {
     const markets: MarketWithSelections[] = [];
 
     for (const market of marketsResult.rows) {
-      // Get selections for each market
       const selectionsResult = await query(
         `SELECT id, market_id, name, odds, created_at
          FROM selections WHERE market_id = $1`,
@@ -138,7 +132,6 @@ app.get('/events/:id', async (req, res) => {
   }
 });
 
-// Get markets for an event
 app.get('/markets/:eventId', async (req, res) => {
   try {
     const { eventId } = req.params;
@@ -180,7 +173,6 @@ app.get('/markets/:eventId', async (req, res) => {
   }
 });
 
-// Internal: Create event with markets and selections
 app.post('/internal/events', async (req, res) => {
   try {
     const { sport, name, home_team, away_team, start_time, markets } = req.body;
@@ -192,7 +184,6 @@ app.post('/internal/events', async (req, res) => {
 
     await query('BEGIN');
 
-    // Create event
     const eventId = uuidv4();
     await query(
       `INSERT INTO events (id, sport, name, home_team, away_team, start_time, status, created_at)
@@ -200,7 +191,6 @@ app.post('/internal/events', async (req, res) => {
       [eventId, sport, name, home_team || null, away_team || null, start_time]
     );
 
-    // Create markets and selections if provided
     if (markets && Array.isArray(markets)) {
       for (const market of markets) {
         const marketId = uuidv4();
@@ -224,7 +214,6 @@ app.post('/internal/events', async (req, res) => {
 
     await query('COMMIT');
 
-    // Fetch the created event with markets
     const eventResult = await query(
       `SELECT id, sport, name, home_team, away_team, start_time, status, created_at
        FROM events WHERE id = $1`,
@@ -239,7 +228,6 @@ app.post('/internal/events', async (req, res) => {
   }
 });
 
-// Internal: Update event status
 app.patch('/internal/events/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -250,7 +238,6 @@ app.patch('/internal/events/:id/status', async (req, res) => {
       return;
     }
 
-    // Get current status
     const currentResult = await query(
       'SELECT status FROM events WHERE id = $1',
       [id]
@@ -263,13 +250,11 @@ app.patch('/internal/events/:id/status', async (req, res) => {
 
     const oldStatus = currentResult.rows[0].status as EventStatus;
 
-    // Update status
     await query(
       'UPDATE events SET status = $1 WHERE id = $2',
       [status, id]
     );
 
-    // Also update market statuses based on event status
     if (status === 'live') {
       await query(
         'UPDATE markets SET status = $1 WHERE event_id = $2 AND status = $3',
@@ -282,7 +267,6 @@ app.patch('/internal/events/:id/status', async (req, res) => {
       );
     }
 
-    // Publish event status change
     try {
       await publishEvent('events.status_changed', {
         type: 'EVENT_STATUS_CHANGED',
@@ -310,7 +294,6 @@ app.patch('/internal/events/:id/status', async (req, res) => {
   }
 });
 
-// Internal: Get selection by ID
 app.get('/internal/selections/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -336,7 +319,6 @@ app.get('/internal/selections/:id', async (req, res) => {
   }
 });
 
-// Initialize RabbitMQ connection
 async function initializeMessageQueue() {
   try {
     await connectRabbitMQ();

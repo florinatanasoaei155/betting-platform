@@ -24,10 +24,8 @@ export async function connectRabbitMQ(): Promise<Channel> {
     connection = await amqp.connect(RABBITMQ_URL);
     channel = await connection.createChannel();
 
-    // Setup exchange
     await channel.assertExchange(EXCHANGES.BETTING, 'topic', { durable: true });
 
-    // Setup queues
     for (const queue of Object.values(QUEUES)) {
       await channel.assertQueue(queue, { durable: true });
       await channel.bindQueue(queue, EXCHANGES.BETTING, `${queue}.*`);

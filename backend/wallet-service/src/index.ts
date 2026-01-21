@@ -21,12 +21,10 @@ const PORT = process.env.PORT || 3002;
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', service: 'wallet-service' });
 });
 
-// Get wallet balance (protected)
 app.get('/balance', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const result = await query(
@@ -60,7 +58,6 @@ app.get('/balance', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Deposit funds (protected)
 app.post('/deposit', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { amount } = req.body as DepositRequest;
@@ -74,7 +71,6 @@ app.post('/deposit', authMiddleware, async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    // Get wallet
     const walletResult = await query(
       'SELECT id, balance FROM wallets WHERE user_id = $1',
       [req.user!.userId]
@@ -92,7 +88,6 @@ app.post('/deposit', authMiddleware, async (req: AuthenticatedRequest, res) => {
     const wallet = walletResult.rows[0];
     const newBalance = parseFloat(wallet.balance) + amount;
 
-    // Update balance and create transaction
     await query('BEGIN');
 
     await query(
@@ -108,7 +103,6 @@ app.post('/deposit', authMiddleware, async (req: AuthenticatedRequest, res) => {
 
     await query('COMMIT');
 
-    // Get updated wallet
     const updatedResult = await query(
       'SELECT id, user_id, balance, currency, created_at FROM wallets WHERE id = $1',
       [wallet.id]
@@ -131,7 +125,6 @@ app.post('/deposit', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Withdraw funds (protected)
 app.post('/withdraw', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { amount } = req.body as WithdrawRequest;
@@ -145,7 +138,6 @@ app.post('/withdraw', authMiddleware, async (req: AuthenticatedRequest, res) => 
       return;
     }
 
-    // Get wallet
     const walletResult = await query(
       'SELECT id, balance FROM wallets WHERE user_id = $1',
       [req.user!.userId]
@@ -174,7 +166,6 @@ app.post('/withdraw', authMiddleware, async (req: AuthenticatedRequest, res) => 
 
     const newBalance = currentBalance - amount;
 
-    // Update balance and create transaction
     await query('BEGIN');
 
     await query(
@@ -190,7 +181,6 @@ app.post('/withdraw', authMiddleware, async (req: AuthenticatedRequest, res) => 
 
     await query('COMMIT');
 
-    // Get updated wallet
     const updatedResult = await query(
       'SELECT id, user_id, balance, currency, created_at FROM wallets WHERE id = $1',
       [wallet.id]
@@ -213,13 +203,11 @@ app.post('/withdraw', authMiddleware, async (req: AuthenticatedRequest, res) => 
   }
 });
 
-// Get transaction history (protected)
 app.get('/transactions', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
-    // Get wallet ID first
     const walletResult = await query(
       'SELECT id FROM wallets WHERE user_id = $1',
       [req.user!.userId]
@@ -263,7 +251,6 @@ app.get('/transactions', authMiddleware, async (req: AuthenticatedRequest, res) 
   }
 });
 
-// Internal endpoint: Get wallet by user ID
 app.get('/internal/wallet/:userId', async (req, res) => {
   try {
     const result = await query(
@@ -282,7 +269,6 @@ app.get('/internal/wallet/:userId', async (req, res) => {
   }
 });
 
-// Internal endpoint: Deduct stake for bet
 app.post('/internal/deduct-stake', async (req, res) => {
   try {
     const { userId, amount, betId } = req.body;
@@ -335,7 +321,6 @@ app.post('/internal/deduct-stake', async (req, res) => {
   }
 });
 
-// Internal endpoint: Credit winnings
 app.post('/internal/credit-winnings', async (req, res) => {
   try {
     const { userId, amount, betId } = req.body;
@@ -381,7 +366,6 @@ app.post('/internal/credit-winnings', async (req, res) => {
   }
 });
 
-// Initialize RabbitMQ consumer for bet events
 async function initializeMessageConsumer() {
   try {
     await connectRabbitMQ();

@@ -18,7 +18,6 @@ import {
   MarketStatus,
 } from 'shared';
 
-// Database row type for bet queries with joins
 interface BetQueryRow {
   id: string;
   user_id: string;
@@ -45,7 +44,6 @@ interface BetQueryRow {
 const app = express();
 const PORT = process.env.PORT || 3003;
 
-// Service URLs
 const WALLET_SERVICE_URL = process.env.WALLET_SERVICE_URL || 'http://localhost:3002';
 const EVENT_SERVICE_URL = process.env.EVENT_SERVICE_URL || 'http://localhost:3005';
 const ODDS_SERVICE_URL = process.env.ODDS_SERVICE_URL || 'http://localhost:3004';
@@ -53,12 +51,10 @@ const ODDS_SERVICE_URL = process.env.ODDS_SERVICE_URL || 'http://localhost:3004'
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', service: 'bet-service' });
 });
 
-// Place a bet (protected)
 app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { selection_id, stake } = req.body as PlaceBetRequest;
@@ -82,7 +78,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    // Check wallet balance
     const walletResponse = await axios.get(`${WALLET_SERVICE_URL}/internal/wallet/${userId}`);
     if (!walletResponse.data.success) {
       const response: ApiResponse<null> = {
@@ -103,7 +98,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    // Verify selection exists and market is open
     const selectionResponse = await axios.get(`${EVENT_SERVICE_URL}/internal/selections/${selection_id}`);
     if (!selectionResponse.data.success) {
       const response: ApiResponse<null> = {
@@ -125,21 +119,17 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
       return;
     }
 
-    // Get current odds (might have changed)
     const oddsResponse = await axios.get(`${ODDS_SERVICE_URL}/odds/${selection_id}`);
     const currentOdds = oddsResponse.data.success
       ? oddsResponse.data.data.odds
       : selection.odds;
 
-    // Calculate potential payout
     const potentialPayout = stake * currentOdds;
     const betId = uuidv4();
 
-    // Start transaction
     await query('BEGIN');
 
     try {
-      // Deduct stake from wallet
       const deductResponse = await axios.post(`${WALLET_SERVICE_URL}/internal/deduct-stake`, {
         userId,
         amount: stake,
@@ -156,7 +146,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
         return;
       }
 
-      // Create bet record
       await query(
         `INSERT INTO bets (id, user_id, selection_id, stake, odds_at_placement, status, potential_payout, created_at)
          VALUES ($1, $2, $3, $4, $5, 'pending', $6, NOW())`,
@@ -165,7 +154,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
 
       await query('COMMIT');
 
-      // Publish bet placed event
       try {
         await publishEvent('bets.placed', {
           type: 'BET_PLACED',
@@ -182,7 +170,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
         console.error('Failed to publish bet placed event:', mqError);
       }
 
-      // Fetch created bet
       const betResult = await query(
         `SELECT id, user_id, selection_id, stake, odds_at_placement, status, potential_payout, created_at
          FROM bets WHERE id = $1`,
@@ -211,7 +198,6 @@ app.post('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Get user's bets (protected)
 app.get('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.userId;
@@ -291,7 +277,6 @@ app.get('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Get single bet (protected)
 app.get('/bets/:id', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
@@ -371,7 +356,6 @@ app.get('/bets/:id', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Internal: Settle bets for a selection
 app.post('/internal/settle', async (req, res) => {
   try {
     const { selection_id, winning } = req.body;
@@ -383,7 +367,6 @@ app.post('/internal/settle', async (req, res) => {
 
     const newStatus = winning ? 'won' : 'lost';
 
-    // Get all pending bets for this selection
     const betsResult = await query(
       'SELECT id, user_id, potential_payout FROM bets WHERE selection_id = $1 AND status = $2',
       [selection_id, 'pending']
@@ -392,13 +375,11 @@ app.post('/internal/settle', async (req, res) => {
     const settledBets: string[] = [];
 
     for (const bet of betsResult.rows) {
-      // Update bet status
       await query(
         'UPDATE bets SET status = $1 WHERE id = $2',
         [newStatus, bet.id]
       );
 
-      // If winning, credit the user's wallet
       if (winning) {
         try {
           await axios.post(`${WALLET_SERVICE_URL}/internal/credit-winnings`, {
@@ -429,7 +410,6 @@ app.post('/internal/settle', async (req, res) => {
   }
 });
 
-// Initialize RabbitMQ connection
 async function initializeMessageQueue() {
   try {
     await connectRabbitMQ();

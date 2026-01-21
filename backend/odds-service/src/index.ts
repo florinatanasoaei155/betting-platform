@@ -18,27 +18,21 @@ const WS_PORT = process.env.WS_PORT || 3014;
 app.use(cors());
 app.use(express.json());
 
-// Create HTTP server for WebSocket
 const wsServer = createServer();
 const wss = new WebSocketServer({ server: wsServer });
 
-// Track WebSocket subscriptions: eventId -> Set of WebSocket clients
 const eventSubscriptions = new Map<string, Set<WebSocket>>();
 
-// Cache TTL in seconds
 const ODDS_CACHE_TTL = 60;
 
-// Health check
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', service: 'odds-service' });
 });
 
-// Get odds for a selection
 app.get('/odds/:selectionId', async (req, res) => {
   try {
     const { selectionId } = req.params;
 
-    // Try cache first
     const cachedOdds = await redis.get(`odds:${selectionId}`);
     if (cachedOdds) {
       const response: ApiResponse<{ selectionId: string; odds: number }> = {
@@ -49,7 +43,6 @@ app.get('/odds/:selectionId', async (req, res) => {
       return;
     }
 
-    // Fetch from database
     const result = await query(
       'SELECT id, market_id, name, odds FROM selections WHERE id = $1',
       [selectionId]
@@ -66,7 +59,6 @@ app.get('/odds/:selectionId', async (req, res) => {
 
     const selection: Selection = result.rows[0];
 
-    // Cache the odds
     await redis.setex(`odds:${selectionId}`, ODDS_CACHE_TTL, selection.odds.toString());
 
     const response: ApiResponse<Selection> = {
@@ -85,7 +77,6 @@ app.get('/odds/:selectionId', async (req, res) => {
   }
 });
 
-// Get all odds for a market
 app.get('/odds/market/:marketId', async (req, res) => {
   try {
     const { marketId } = req.params;
@@ -97,7 +88,6 @@ app.get('/odds/market/:marketId', async (req, res) => {
 
     const selections: Selection[] = result.rows;
 
-    // Cache each selection's odds
     for (const selection of selections) {
       await redis.setex(`odds:${selection.id}`, ODDS_CACHE_TTL, selection.odds.toString());
     }
@@ -118,7 +108,6 @@ app.get('/odds/market/:marketId', async (req, res) => {
   }
 });
 
-// Internal: Update odds for a selection
 app.put('/internal/odds/:selectionId', async (req, res) => {
   try {
     const { selectionId } = req.params;
@@ -129,7 +118,6 @@ app.put('/internal/odds/:selectionId', async (req, res) => {
       return;
     }
 
-    // Get current odds
     const currentResult = await query(
       `SELECT s.odds, m.event_id
        FROM selections s
@@ -146,16 +134,13 @@ app.put('/internal/odds/:selectionId', async (req, res) => {
     const oldOdds = parseFloat(currentResult.rows[0].odds);
     const eventId = currentResult.rows[0].event_id;
 
-    // Update odds in database
     await query(
       'UPDATE selections SET odds = $1 WHERE id = $2',
       [odds, selectionId]
     );
 
-    // Update cache
     await redis.setex(`odds:${selectionId}`, ODDS_CACHE_TTL, odds.toString());
 
-    // Publish odds update event
     try {
       await publishEvent('odds.updated', {
         type: 'ODDS_UPDATED',
@@ -170,7 +155,6 @@ app.put('/internal/odds/:selectionId', async (req, res) => {
       console.error('Failed to publish odds update:', mqError);
     }
 
-    // Broadcast to WebSocket subscribers
     broadcastOddsUpdate(eventId, selectionId, oldOdds, odds);
 
     res.json({ success: true, data: { selectionId, odds } });
@@ -180,7 +164,6 @@ app.put('/internal/odds/:selectionId', async (req, res) => {
   }
 });
 
-// Broadcast odds update to WebSocket subscribers
 function broadcastOddsUpdate(eventId: string, selectionId: string, oldOdds: number, newOdds: number) {
   const subscribers = eventSubscriptions.get(eventId);
   if (!subscribers) return;
@@ -203,7 +186,6 @@ function broadcastOddsUpdate(eventId: string, selectionId: string, oldOdds: numb
   }
 }
 
-// WebSocket connection handler
 wss.on('connection', (ws) => {
   console.log('New WebSocket connection');
 
@@ -212,7 +194,6 @@ wss.on('connection', (ws) => {
       const message = JSON.parse(data.toString());
 
       if (message.type === 'SUBSCRIBE' && message.eventId) {
-        // Subscribe to event odds updates
         if (!eventSubscriptions.has(message.eventId)) {
           eventSubscriptions.set(message.eventId, new Set());
         }
@@ -227,7 +208,6 @@ wss.on('connection', (ws) => {
       }
 
       if (message.type === 'UNSUBSCRIBE' && message.eventId) {
-        // Unsubscribe from event
         const subscribers = eventSubscriptions.get(message.eventId);
         if (subscribers) {
           subscribers.delete(ws);
@@ -247,7 +227,6 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    // Remove from all subscriptions
     for (const [eventId, subscribers] of eventSubscriptions.entries()) {
       subscribers.delete(ws);
       if (subscribers.size === 0) {
@@ -262,7 +241,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Mock odds fluctuation simulator (for demo purposes)
 let simulatorInterval: NodeJS.Timeout | null = null;
 
 async function startOddsSimulator() {
@@ -270,7 +248,6 @@ async function startOddsSimulator() {
 
   simulatorInterval = setInterval(async () => {
     try {
-      // Get random live event selections
       const result = await query(`
         SELECT s.id, s.odds, m.event_id
         FROM selections s
@@ -282,19 +259,15 @@ async function startOddsSimulator() {
       `);
 
       for (const row of result.rows) {
-        // Randomly adjust odds by -5% to +5%
         const adjustment = 0.95 + Math.random() * 0.1;
         const newOdds = Math.max(1.01, parseFloat(row.odds) * adjustment);
         const roundedOdds = Math.round(newOdds * 100) / 100;
 
-        // Update odds
         await query('UPDATE selections SET odds = $1 WHERE id = $2', [roundedOdds, row.id]);
         await redis.setex(`odds:${row.id}`, ODDS_CACHE_TTL, roundedOdds.toString());
 
-        // Broadcast update
         broadcastOddsUpdate(row.event_id, row.id, parseFloat(row.odds), roundedOdds);
 
-        // Publish to RabbitMQ
         try {
           await publishEvent('odds.updated', {
             type: 'ODDS_UPDATED',
@@ -306,16 +279,13 @@ async function startOddsSimulator() {
             },
           });
         } catch (mqError) {
-          // Ignore MQ errors in simulator
         }
       }
     } catch (error) {
-      // Ignore errors in simulator
     }
-  }, 5000); // Run every 5 seconds
+  }, 5000);
 }
 
-// Endpoint to control simulator
 app.post('/internal/simulator/start', (_, res) => {
   startOddsSimulator();
   res.json({ success: true, message: 'Odds simulator started' });
@@ -329,7 +299,6 @@ app.post('/internal/simulator/stop', (_, res) => {
   res.json({ success: true, message: 'Odds simulator stopped' });
 });
 
-// Initialize RabbitMQ connection
 async function initializeMessageQueue() {
   try {
     await connectRabbitMQ();

@@ -1,9 +1,5 @@
--- Betting Platform Database Schema
-
--- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Users table
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -15,7 +11,6 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
 
--- Wallets table
 CREATE TABLE IF NOT EXISTS wallets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -26,7 +21,6 @@ CREATE TABLE IF NOT EXISTS wallets (
 
 CREATE INDEX idx_wallets_user_id ON wallets(user_id);
 
--- Transactions table
 CREATE TABLE IF NOT EXISTS transactions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     wallet_id UUID NOT NULL REFERENCES wallets(id) ON DELETE CASCADE,
@@ -39,7 +33,6 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX idx_transactions_wallet_id ON transactions(wallet_id);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 
--- Sports Events table
 CREATE TABLE IF NOT EXISTS events (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     sport VARCHAR(50) NOT NULL CHECK (sport IN ('football', 'basketball', 'tennis', 'horse_racing')),
@@ -55,7 +48,6 @@ CREATE INDEX idx_events_sport ON events(sport);
 CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_events_start_time ON events(start_time);
 
--- Markets table (betting markets for each event)
 CREATE TABLE IF NOT EXISTS markets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
@@ -68,7 +60,6 @@ CREATE TABLE IF NOT EXISTS markets (
 CREATE INDEX idx_markets_event_id ON markets(event_id);
 CREATE INDEX idx_markets_status ON markets(status);
 
--- Selections table (odds for each market outcome)
 CREATE TABLE IF NOT EXISTS selections (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     market_id UUID NOT NULL REFERENCES markets(id) ON DELETE CASCADE,
@@ -79,7 +70,6 @@ CREATE TABLE IF NOT EXISTS selections (
 
 CREATE INDEX idx_selections_market_id ON selections(market_id);
 
--- Bets table
 CREATE TABLE IF NOT EXISTS bets (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,

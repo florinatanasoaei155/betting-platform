@@ -32,6 +32,55 @@ Data Stores (Docker):
 └── RabbitMQ (port 5672/15672) - Event messaging
 ```
 
+## Technology Choices
+
+### Frontend
+
+| Technology | Purpose | Why This Choice |
+|------------|---------|-----------------|
+| **React 19** | UI Framework | Latest stable version with improved performance, automatic batching, and better concurrent features. The new compiler optimizations reduce bundle size and improve runtime performance. |
+| **Vite** | Build Tool | Extremely fast HMR (Hot Module Replacement) with native ESM support. Development server starts in milliseconds compared to webpack's seconds. Zero-config TypeScript and JSX support. |
+| **Apollo Client** | GraphQL Client | Intelligent caching with normalized data store, automatic query refetching on mutations, built-in WebSocket subscription support for real-time updates. |
+| **React Router v6** | Routing | Type-safe routing with nested routes support, declarative navigation, and built-in loader/action patterns for data fetching. |
+| **Zustand** | State Management | Minimal footprint (~1kb gzipped), no boilerplate or providers required, works seamlessly with React 19's concurrent features. Chosen over Redux for simplicity in this scope. |
+| **Tailwind CSS** | Styling | Utility-first approach eliminates CSS naming conflicts, enables rapid prototyping, and creates a consistent design system. Purges unused styles in production for optimal bundle size. |
+| **TypeScript** | Type Safety | Compile-time error catching, better IDE autocompletion, and self-documenting code. Shared types with backend ensure API contract consistency. |
+
+### Backend
+
+| Technology | Purpose | Why This Choice |
+|------------|---------|-----------------|
+| **Node.js + Express** | HTTP Server | Non-blocking I/O is ideal for I/O-bound microservices. Express provides minimal overhead with extensive middleware ecosystem for authentication, CORS, and rate limiting. |
+| **Apollo Server** | GraphQL Gateway | Industry-standard GraphQL implementation with built-in schema stitching, caching directives, and excellent developer tooling (GraphQL Playground). |
+| **PostgreSQL** | Primary Database | ACID compliance essential for financial transactions (bets, wallet balances). Complex query support for event filtering, JSON types for flexible data, and proven reliability at scale. |
+| **Redis** | Caching Layer | Sub-millisecond read latency for odds caching, built-in pub/sub for real-time event broadcasting, and rate limiting support via sliding window algorithms. |
+| **RabbitMQ** | Message Queue | Reliable message delivery with acknowledgments, flexible routing patterns (topic exchange), and service decoupling for bet placement events and odds updates. |
+| **JWT** | Authentication | Stateless authentication scales horizontally without session storage. Access tokens (1h) and refresh tokens (7d) balance security with user experience. |
+| **TypeScript** | Type Safety | Shared type definitions between services eliminate API contract mismatches. Runtime type validation reduces bugs in production. |
+
+### Infrastructure
+
+| Technology | Purpose | Why This Choice |
+|------------|---------|-----------------|
+| **Docker Compose** | Container Orchestration | Ensures consistent development environments across teams. Single command spins up all infrastructure dependencies. Profile support separates dev and production configurations. |
+| **npm Workspaces** | Monorepo Management | Shared dependencies reduce disk usage, coordinated builds ensure compatibility, single package-lock provides reproducible installs. Simpler than Turborepo/Nx for this project scope. |
+
+### Why GraphQL at Gateway, REST Internally?
+
+The hybrid API approach combines the best of both worlds:
+
+**GraphQL at Gateway:**
+- Single endpoint reduces client-side complexity
+- Schema acts as API documentation
+- Clients request exactly the data they need (no over-fetching)
+- WebSocket subscriptions for real-time odds updates
+
+**REST Between Services:**
+- Simpler to implement and debug
+- Well-understood patterns for inter-service communication
+- No GraphQL federation complexity needed for internal calls
+- Easier to add caching headers and monitoring
+
 ## Prerequisites
 
 - Node.js 18+
@@ -45,10 +94,8 @@ Data Stores (Docker):
 ### 1. Start Infrastructure (Docker)
 
 ```bash
-# Start PostgreSQL, Redis, and RabbitMQ containers
 npm run docker:up
 
-# Verify containers are running
 docker ps
 ```
 
@@ -60,14 +107,12 @@ Expected containers:
 ### 2. Install Dependencies
 
 ```bash
-# Install all workspace dependencies
 npm install
 ```
 
 ### 3. Seed the Database
 
 ```bash
-# Populate database with test events, markets, and selections
 npm run db:seed
 ```
 
@@ -83,37 +128,30 @@ This creates:
 **Option A: Run locally (Node.js)**
 
 ```bash
-# Start frontend + all backend services
 npm run dev
 ```
 
 Or start separately:
 
 ```bash
-# Frontend only
 npm run dev:frontend
 
-# Backend services only
 npm run dev:backend
 ```
 
 **Option B: Run frontend in Docker (with hot reloading)**
 
 ```bash
-# Start infrastructure + frontend container
 npm run docker:dev
 
-# Or rebuild and start (after Dockerfile changes)
 npm run docker:dev:build
 
-# View frontend logs
 npm run docker:dev:logs
 
-# Then start backend services locally
 npm run dev:backend
 ```
 
-The Docker frontend runs with hot reloading enabled - any changes to files in `frontend/src/` will automatically trigger a rebuild.
+The Docker frontend runs with hot reloading enabled via Vite's polling mode.
 
 ### 5. Access the Application
 
@@ -123,105 +161,229 @@ The Docker frontend runs with hot reloading enabled - any changes to files in `f
 | GraphQL Playground | http://localhost:3000/graphql | API testing interface |
 | RabbitMQ Management | http://localhost:15672 | Message broker admin (betting/betting123) |
 
-## Services Overview
+## Services Deep Dive
 
 ### API Gateway (Port 3000)
 
-GraphQL endpoint aggregating all backend services.
+**Technology Stack:** Apollo Server, GraphQL, WebSocket
 
-**Key Operations:**
+The API Gateway aggregates all backend microservices through a single GraphQL endpoint.
+
+**Key Responsibilities:**
+- **Single Entry Point**: Clients only need to know one endpoint
+- **Authorization**: Centralized JWT validation before routing requests
+- **Rate Limiting**: Redis-backed request throttling (100 requests/minute per IP)
+- **WebSocket Subscriptions**: Real-time odds updates via GraphQL subscriptions
+
+**GraphQL Schema:**
 ```graphql
-# Queries
-me                    # Current user profile
-events(sport, status) # List events with filters
-event(id)            # Single event with markets
-myBets               # User's bet history
-wallet               # User's wallet balance
-transactions         # Transaction history
+type Query {
+  me: User
+  events(sport: Sport, status: EventStatus): [Event!]!
+  event(id: ID!): Event
+  myBets: [Bet!]!
+  wallet: Wallet
+  transactions: [Transaction!]!
+}
 
-# Mutations
-register(input)      # Create account
-login(input)         # Authenticate
-placeBet(input)      # Place a bet
-deposit(amount)      # Add funds
-withdraw(amount)     # Remove funds
+type Mutation {
+  register(input: RegisterInput!): AuthPayload!
+  login(input: LoginInput!): AuthPayload!
+  placeBet(input: PlaceBetInput!): Bet!
+  deposit(amount: Float!): Wallet!
+  withdraw(amount: Float!): Wallet!
+}
 
-# Subscriptions
-oddsUpdated(eventId) # Real-time odds changes
+type Subscription {
+  oddsUpdated(eventId: ID!): OddsUpdate!
+}
 ```
 
 ### User Service (Port 3001)
 
+**Technology Stack:** Express, bcryptjs, JWT
+
 Handles authentication and user management.
 
-- `POST /register` - Create new account (includes $100 demo balance)
-- `POST /login` - Authenticate user
-- `POST /refresh` - Refresh access token
-- `GET /profile` - Get user profile (protected)
+**Security Implementation:**
+- Password hashing with bcrypt (10 salt rounds)
+- JWT access tokens (1 hour expiry) for API authentication
+- JWT refresh tokens (7 days expiry) for session continuity
+- Automatic wallet creation with $100 demo balance on registration
+
+**Endpoints:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | /register | No | Create account |
+| POST | /login | No | Authenticate |
+| POST | /refresh | No | Refresh access token |
+| GET | /profile | Yes | Get user profile |
+| GET | /internal/user/:id | Internal | Service lookup |
 
 ### Wallet Service (Port 3002)
 
-Manages user balances and transactions.
+**Technology Stack:** Express, PostgreSQL transactions
 
-- `GET /balance` - Get wallet balance
-- `POST /deposit` - Add funds
-- `POST /withdraw` - Remove funds
-- `GET /transactions` - Transaction history
+Manages user balances and transactions with ACID compliance.
+
+**Data Integrity Features:**
+- All balance changes wrapped in PostgreSQL transactions
+- Automatic rollback on any failure
+- Transaction history for complete audit trail
+- Optimistic locking prevents race conditions
+
+**Endpoints:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /balance | Yes | Get wallet balance |
+| POST | /deposit | Yes | Add funds |
+| POST | /withdraw | Yes | Remove funds |
+| GET | /transactions | Yes | Transaction history |
+| POST | /internal/deduct-stake | Internal | Deduct bet stake |
+| POST | /internal/credit-winnings | Internal | Credit winnings |
 
 ### Bet Service (Port 3003)
 
-Handles bet placement and management.
+**Technology Stack:** Express, Axios for inter-service communication
 
-- `POST /bets` - Place a bet
-- `GET /bets` - List user's bets
-- `GET /bets/:id` - Get single bet details
+Handles bet placement and management with distributed transaction coordination.
+
+**Bet Placement Flow:**
+1. Validate user balance via Wallet Service
+2. Verify selection exists and market is open via Event Service
+3. Lock current odds at placement time (protects user from odds drift)
+4. Deduct stake from wallet (transactional)
+5. Create bet record in database
+6. Publish BET_PLACED event to RabbitMQ
+
+**Endpoints:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | /bets | Yes | Place a bet |
+| GET | /bets | Yes | List user's bets |
+| GET | /bets/:id | Yes | Get single bet |
+| POST | /internal/settle | Internal | Settle bets for selection |
 
 ### Odds Service (Port 3004)
 
-Manages odds with real-time updates.
+**Technology Stack:** Express, Redis caching, WebSocket
 
-- `GET /odds/:selectionId` - Get current odds
-- `GET /odds/market/:marketId` - Get all odds for market
-- WebSocket server on port 3014 for live updates
-- Built-in odds fluctuation simulator for live events
+Manages odds with real-time updates and intelligent caching.
+
+**Caching Strategy:**
+- Redis cache with 60-second TTL for all odds
+- Cache-aside pattern: check cache first, fallback to database
+- Cache invalidation on odds update
+
+**Real-time Updates:**
+- WebSocket server on port 3014 for live odds streaming
+- Built-in odds fluctuation simulator (adjusts by -5% to +5% every 5 seconds for live events)
+- Publishes ODDS_UPDATED to RabbitMQ for cross-service communication
+
+**Endpoints:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /odds/:selectionId | No | Get current odds |
+| GET | /odds/market/:marketId | No | Get all market odds |
+| PUT | /internal/odds/:selectionId | Internal | Update odds |
+| POST | /internal/simulator/start | Internal | Start odds simulator |
+| POST | /internal/simulator/stop | Internal | Stop odds simulator |
 
 ### Event Service (Port 3005)
 
-Manages sports events and markets.
+**Technology Stack:** Express, PostgreSQL
 
-- `GET /events` - List events (filterable by sport/status)
-- `GET /events/:id` - Get event with markets and selections
-- `GET /markets/:eventId` - Get markets for event
+Manages sports events, markets, and selections.
+
+**Data Model:**
+- **Events**: Sports matches (football, basketball, tennis) with home/away teams and status (upcoming, live, finished, cancelled)
+- **Markets**: Betting options per event (Match Winner, Over/Under, Both Teams to Score, Handicap)
+- **Selections**: Individual outcomes with decimal odds
+
+**Endpoints:**
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | /events | No | List events with filters |
+| GET | /events/:id | No | Get event with markets |
+| GET | /markets/:eventId | No | Get markets for event |
+| POST | /internal/events | Internal | Create event |
+| PATCH | /internal/events/:id/status | Internal | Update event status |
+| GET | /internal/selections/:id | Internal | Get selection details |
 
 ## Project Structure
 
 ```
 betting-platform/
-├── docker-compose.yml          # Infrastructure containers
-├── package.json                # Root workspace config
-├── frontend/                   # React + Vite application
-│   ├── src/
-│   │   ├── components/        # Reusable UI components
-│   │   ├── pages/             # Route pages
-│   │   ├── graphql/           # Queries and mutations
-│   │   ├── lib/               # Apollo client, auth helpers
-│   │   └── store/             # Zustand state (bet slip)
-│   └── ...
+├── docker-compose.yml
+├── package.json
+├── scripts/
+│   └── cleanup.sh
+├── frontend/
+│   ├── Dockerfile.dev
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tailwind.config.js
+│   └── src/
+│       ├── main.tsx
+│       ├── App.tsx
+│       ├── index.css
+│       ├── components/
+│       │   ├── Layout/
+│       │   ├── EventCard/
+│       │   └── BetSlip/
+│       ├── pages/
+│       │   ├── Home.tsx
+│       │   ├── Events.tsx
+│       │   ├── EventDetail.tsx
+│       │   ├── Login.tsx
+│       │   ├── Register.tsx
+│       │   ├── MyBets.tsx
+│       │   └── Wallet.tsx
+│       ├── graphql/
+│       │   ├── queries.ts
+│       │   └── mutations.ts
+│       ├── lib/
+│       │   ├── apollo-client.ts
+│       │   └── auth.ts
+│       └── store/
+│           └── useStore.ts
 └── backend/
-    ├── shared/                # Shared utilities and types
+    ├── shared/
+    │   ├── package.json
+    │   ├── tsconfig.json
     │   └── src/
-    │       ├── types/         # TypeScript interfaces
-    │       ├── middleware/    # Auth middleware
-    │       └── utils/         # DB, Redis, RabbitMQ clients
-    ├── api-gateway/           # GraphQL gateway
-    ├── user-service/          # Authentication service
-    ├── wallet-service/        # Balance management
-    ├── bet-service/           # Bet placement
-    ├── odds-service/          # Odds management + WebSocket
-    ├── event-service/         # Events and markets
+    │       ├── index.ts
+    │       ├── types/
+    │       │   └── index.ts
+    │       ├── middleware/
+    │       │   └── auth.ts
+    │       └── utils/
+    │           ├── db.ts
+    │           ├── redis.ts
+    │           └── rabbitmq.ts
+    ├── api-gateway/
+    │   └── src/
+    │       ├── index.ts
+    │       ├── schema.ts
+    │       └── resolvers.ts
+    ├── user-service/
+    │   └── src/
+    │       └── index.ts
+    ├── wallet-service/
+    │   └── src/
+    │       └── index.ts
+    ├── bet-service/
+    │   └── src/
+    │       └── index.ts
+    ├── odds-service/
+    │   └── src/
+    │       └── index.ts
+    ├── event-service/
+    │   └── src/
+    │       └── index.ts
     └── database/
-        ├── init.sql           # Schema initialization
-        └── seed.ts            # Test data seeder
+        ├── init.sql
+        └── seed.ts
 ```
 
 ## Development
@@ -231,21 +393,17 @@ betting-platform/
 Services use these defaults (override via environment):
 
 ```bash
-# Database
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=betting_platform
 DB_USER=betting
 DB_PASSWORD=betting123
 
-# Redis
 REDIS_HOST=localhost
 REDIS_PORT=6379
 
-# RabbitMQ
 RABBITMQ_URL=amqp://betting:betting123@localhost:5672
 
-# JWT
 JWT_SECRET=your-secret-key
 JWT_EXPIRES_IN=1h
 JWT_REFRESH_EXPIRES_IN=7d
@@ -254,13 +412,12 @@ JWT_REFRESH_EXPIRES_IN=7d
 ### Useful Commands
 
 ```bash
-# Stop all Docker containers
 npm run docker:down
 
-# Rebuild and restart containers
 npm run docker:down && npm run docker:up
 
-# View service logs
+npm run docker:clean
+
 docker logs betting-postgres
 docker logs betting-redis
 docker logs betting-rabbitmq
@@ -271,7 +428,6 @@ docker logs betting-rabbitmq
 Using GraphQL Playground at http://localhost:3000/graphql:
 
 ```graphql
-# Register a new user
 mutation {
   register(input: {
     email: "test@example.com"
@@ -283,7 +439,6 @@ mutation {
   }
 }
 
-# Login
 mutation {
   login(input: {
     email: "test@example.com"
@@ -294,7 +449,6 @@ mutation {
   }
 }
 
-# Get events (set Authorization header: Bearer <token>)
 query {
   events(sport: football, status: upcoming) {
     id
@@ -304,7 +458,6 @@ query {
   }
 }
 
-# Place a bet
 mutation {
   placeBet(input: {
     selectionId: "<selection-id>"
@@ -317,10 +470,10 @@ mutation {
 }
 ```
 
-## Tech Stack
+## Tech Stack Summary
 
 ### Frontend
-- React 18 + TypeScript
+- React 19 + TypeScript
 - Vite (build tool)
 - Apollo Client (GraphQL)
 - React Router v6
@@ -343,3 +496,16 @@ mutation {
 - Bet slip with multiple selections
 - Transaction history
 - Responsive dark theme UI
+
+## Cleanup
+
+To completely remove all Docker resources:
+
+```bash
+npm run docker:clean
+```
+
+This will:
+- Stop all betting-platform containers
+- Remove containers, images, and volumes
+- Prune dangling images and unused networks

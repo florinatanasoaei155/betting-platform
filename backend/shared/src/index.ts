@@ -1,13 +1,9 @@
-// Types
 export * from './types';
 
-// Database
 export { default as db, query, getClient } from './utils/db';
 
-// Redis
 export { default as redis } from './utils/redis';
 
-// RabbitMQ
 export {
   connectRabbitMQ,
   publishEvent,
@@ -17,7 +13,6 @@ export {
   EXCHANGES,
 } from './utils/rabbitmq';
 
-// Middleware
 export {
   authMiddleware,
   generateAccessToken,

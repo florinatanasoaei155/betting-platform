@@ -29,19 +29,16 @@ interface SelectionData {
   odds: number;
 }
 
-// Generate random odds between min and max
 function randomOdds(min: number, max: number): number {
   return Math.round((min + Math.random() * (max - min)) * 100) / 100;
 }
 
-// Generate future date within next N days
 function futureDate(daysMin: number, daysMax: number): Date {
   const now = new Date();
   const days = daysMin + Math.random() * (daysMax - daysMin);
   return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
-// Football teams
 const footballTeams = [
   ['Manchester United', 'Liverpool'],
   ['Arsenal', 'Chelsea'],
@@ -55,7 +52,6 @@ const footballTeams = [
   ['Benfica', 'Porto'],
 ];
 
-// Basketball teams
 const basketballTeams = [
   ['Lakers', 'Celtics'],
   ['Warriors', 'Nets'],
@@ -69,7 +65,6 @@ const basketballTeams = [
   ['Raptors', 'Pacers'],
 ];
 
-// Tennis players
 const tennisPlayers = [
   ['Djokovic', 'Nadal'],
   ['Alcaraz', 'Sinner'],
@@ -83,11 +78,9 @@ const tennisPlayers = [
   ['Auger-Aliassime', 'Khachanov'],
 ];
 
-// Generate events data
 function generateEvents(): EventData[] {
   const events: EventData[] = [];
 
-  // Football events
   for (const [home, away] of footballTeams) {
     const homeOdds = randomOdds(1.5, 4.0);
     const drawOdds = randomOdds(2.5, 4.5);
@@ -129,7 +122,6 @@ function generateEvents(): EventData[] {
     });
   }
 
-  // Basketball events
   for (const [home, away] of basketballTeams) {
     const homeOdds = randomOdds(1.3, 3.0);
     const awayOdds = randomOdds(1.3, 3.0);
@@ -169,7 +161,6 @@ function generateEvents(): EventData[] {
     });
   }
 
-  // Tennis events
   for (const [player1, player2] of tennisPlayers) {
     const p1Odds = randomOdds(1.3, 3.5);
     const p2Odds = randomOdds(1.3, 3.5);
@@ -210,7 +201,6 @@ async function seed() {
   try {
     console.log('Starting database seed...');
 
-    // Clear existing data (in reverse order of dependencies)
     console.log('Clearing existing data...');
     await client.query('DELETE FROM bets');
     await client.query('DELETE FROM selections');
@@ -223,14 +213,12 @@ async function seed() {
     for (const event of events) {
       const eventId = uuidv4();
 
-      // Insert event
       await client.query(
         `INSERT INTO events (id, sport, name, home_team, away_team, start_time, status, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, 'upcoming', NOW())`,
         [eventId, event.sport, event.name, event.home_team, event.away_team, event.start_time]
       );
 
-      // Insert markets and selections
       for (const market of event.markets) {
         const marketId = uuidv4();
 
@@ -250,7 +238,6 @@ async function seed() {
       }
     }
 
-    // Set a few events to 'live' status for testing
     const liveEvents = await client.query(
       `UPDATE events SET status = 'live'
        WHERE id IN (SELECT id FROM events WHERE status = 'upcoming' LIMIT 3)

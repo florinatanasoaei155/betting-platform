@@ -22,8 +22,10 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:dev": "docker compose --profile dev up -d",
-    "docker:dev:build": "docker compose --profile dev up -d --build",
+    "docker:dev:build": "docker compose --profile dev build --no-cache && docker compose --profile dev up -d",
     "docker:dev:logs": "docker compose --profile dev logs -f frontend",
+    "docker:clean": "bash scripts/cleanup.sh",
+    "clean": "rm -rf node_modules frontend/node_modules backend/*/node_modules backend/shared/dist frontend/dist",
     "db:seed": "npx tsx backend/database/seed.ts"
   },
   "devDependencies": {

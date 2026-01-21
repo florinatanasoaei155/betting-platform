@@ -25,7 +25,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
       <header className="bg-betting-dark border-b border-gray-800">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -80,7 +79,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </Link>
                 </>
               )}
-              {/* Bet slip toggle */}
               <button
                 onClick={toggleBetSlip}
                 className="relative bg-betting-accent text-betting-dark px-4 py-2 rounded-lg font-semibold"
@@ -97,11 +95,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Main content */}
       <div className="flex-1 flex">
         <main className="flex-1 container mx-auto px-4 py-6">{children}</main>
 
-        {/* Bet slip sidebar */}
         {showBetSlip && (
           <aside className="w-80 bg-betting-dark border-l border-gray-800 p-4">
             <BetSlip />
@@ -109,7 +105,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         )}
       </div>
 
-      {/* Footer */}
       <footer className="bg-betting-dark border-t border-gray-800 py-4">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>BetPlatform - Demo Sports Betting Platform</p>

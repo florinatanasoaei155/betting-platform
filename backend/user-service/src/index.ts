@@ -23,12 +23,10 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/health', (_, res) => {
   res.json({ status: 'ok', service: 'user-service' });
 });
 
-// Register
 app.post('/register', async (req, res) => {
   try {
     const { email, username, password } = req.body as RegisterRequest;
@@ -42,7 +40,6 @@ app.post('/register', async (req, res) => {
       return;
     }
 
-    // Check if user exists
     const existingUser = await query(
       'SELECT id FROM users WHERE email = $1 OR username = $2',
       [email, username]
@@ -57,11 +54,9 @@ app.post('/register', async (req, res) => {
       return;
     }
 
-    // Hash password
     const password_hash = await bcrypt.hash(password, 10);
     const id = uuidv4();
 
-    // Create user
     const result = await query(
       `INSERT INTO users (id, email, username, password_hash, created_at)
        VALUES ($1, $2, $3, $4, NOW())
@@ -71,11 +66,10 @@ app.post('/register', async (req, res) => {
 
     const user: UserDTO = result.rows[0];
 
-    // Create wallet for user
     await query(
       `INSERT INTO wallets (id, user_id, balance, currency, created_at)
        VALUES ($1, $2, $3, $4, NOW())`,
-      [uuidv4(), id, 100.00, 'USD'] // Start with $100 demo balance
+      [uuidv4(), id, 100.00, 'USD']
     );
 
     const accessToken = generateAccessToken({ userId: id, email });
@@ -97,7 +91,6 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// Login
 app.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body as LoginRequest;
@@ -163,7 +156,6 @@ app.post('/login', async (req, res) => {
   }
 });
 
-// Refresh token
 app.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.body;
@@ -195,7 +187,6 @@ app.post('/refresh', async (req, res) => {
   }
 });
 
-// Get profile (protected)
 app.get('/profile', authMiddleware, async (req: AuthenticatedRequest, res) => {
   try {
     const result = await query(
@@ -228,7 +219,6 @@ app.get('/profile', authMiddleware, async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// Internal endpoint for other services
 app.get('/internal/user/:id', async (req, res) => {
   try {
     const result = await query(

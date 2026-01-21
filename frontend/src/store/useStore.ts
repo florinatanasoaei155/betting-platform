@@ -16,32 +16,26 @@ export interface User {
 }
 
 interface Store {
-  // Auth
   user: User | null;
   setUser: (user: User | null) => void;
 
-  // Bet slip
   betSlip: BetSlipItem[];
   addToBetSlip: (item: Omit<BetSlipItem, 'stake'>) => void;
   removeFromBetSlip: (selectionId: string) => void;
   updateStake: (selectionId: string, stake: number) => void;
   clearBetSlip: () => void;
 
-  // UI
   showBetSlip: boolean;
   toggleBetSlip: () => void;
 }
 
 export const useStore = create<Store>((set) => ({
-  // Auth
   user: null,
   setUser: (user) => set({ user }),
 
-  // Bet slip
   betSlip: [],
   addToBetSlip: (item) =>
     set((state) => {
-      // Don't add duplicates
       if (state.betSlip.some((b) => b.selectionId === item.selectionId)) {
         return state;
       }
@@ -62,7 +56,6 @@ export const useStore = create<Store>((set) => ({
     })),
   clearBetSlip: () => set({ betSlip: [] }),
 
-  // UI
   showBetSlip: false,
   toggleBetSlip: () => set((state) => ({ showBetSlip: !state.showBetSlip })),
 }));

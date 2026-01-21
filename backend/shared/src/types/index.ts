@@ -1,4 +1,3 @@
-// User types
 export interface User {
   id: string;
   email: string;
@@ -31,7 +30,6 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
-// Wallet types
 export interface Wallet {
   id: string;
   user_id: string;
@@ -57,7 +55,6 @@ export interface WithdrawRequest {
   amount: number;
 }
 
-// Event types
 export type Sport = 'football' | 'basketball' | 'tennis' | 'horse_racing';
 export type EventStatus = 'upcoming' | 'live' | 'finished' | 'cancelled';
 export type MarketStatus = 'open' | 'suspended' | 'closed' | 'settled';
@@ -96,7 +93,6 @@ export interface MarketWithSelections extends Market {
   selections: Selection[];
 }
 
-// Bet types
 export type BetStatus = 'pending' | 'won' | 'lost' | 'void' | 'cashed_out';
 
 export interface Bet {
@@ -121,7 +117,6 @@ export interface BetWithDetails extends Bet {
   event: SportEvent;
 }
 
-// Message queue events
 export interface BetPlacedEvent {
   type: 'BET_PLACED';
   payload: {
@@ -156,14 +151,12 @@ export interface EventStatusChangedEvent {
 
 export type QueueEvent = BetPlacedEvent | OddsUpdatedEvent | EventStatusChangedEvent;
 
-// API Response types
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
 }
 
-// JWT Payload
 export interface JwtPayload {
   userId: string;
   email: string;

@@ -15,24 +15,19 @@ import { verifyToken, redis, JwtPayload } from 'shared';
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Create HTTP server
 const httpServer = createServer(app);
 
-// Create executable schema
 const schema = makeExecutableSchema({ typeDefs, resolvers });
 
-// Create WebSocket server for subscriptions
 const wsServer = new WebSocketServer({
   server: httpServer,
   path: '/graphql',
 });
 
-// Set up WebSocket server
 const serverCleanup = useServer(
   {
     schema,
     context: async (ctx) => {
-      // Get token from connection params
       const token = ctx.connectionParams?.authorization as string;
       if (token) {
         try {
@@ -48,7 +43,6 @@ const serverCleanup = useServer(
   wsServer
 );
 
-// Create Apollo Server
 const apolloServer = new ApolloServer<Context>({
   schema,
   plugins: [
@@ -65,15 +59,13 @@ const apolloServer = new ApolloServer<Context>({
   ],
 });
 
-// Rate limiter using Redis
 const rateLimiter = new RateLimiterRedis({
   storeClient: redis,
   keyPrefix: 'rate_limit',
-  points: 100, // Number of requests
-  duration: 60, // Per 60 seconds
+  points: 100,
+  duration: 60,
 });
 
-// Rate limiting middleware
 const rateLimitMiddleware = async (
   req: express.Request,
   res: express.Response,
@@ -88,7 +80,6 @@ const rateLimitMiddleware = async (
   }
 };
 
-// WebSocket handler for odds updates (connect to odds service)
 function setupOddsWebSocket() {
   const ODDS_WS_URL = process.env.ODDS_WS_URL || 'ws://localhost:3014';
   const WebSocket = require('ws');
@@ -109,7 +100,6 @@ function setupOddsWebSocket() {
       try {
         const message = JSON.parse(data.toString());
         if (message.type === 'ODDS_UPDATE') {
-          // Publish to GraphQL subscriptions
           pubsub.publish(`ODDS_UPDATED_${message.data.eventId}`, {
             oddsUpdated: message.data,
           });
@@ -132,7 +122,6 @@ function setupOddsWebSocket() {
     });
   }
 
-  // Initial connection attempt with delay
   setTimeout(connect, 5000);
 }
 
@@ -142,12 +131,10 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Health check
   app.get('/health', (_, res) => {
     res.json({ status: 'ok', service: 'api-gateway' });
   });
 
-  // Apply rate limiting and GraphQL middleware
   app.use(
     '/graphql',
     rateLimitMiddleware,
@@ -174,7 +161,6 @@ async function startServer() {
     console.log(`WebSocket subscriptions: ws://localhost:${PORT}/graphql`);
   });
 
-  // Connect to odds service WebSocket
   setupOddsWebSocket();
 }
 
