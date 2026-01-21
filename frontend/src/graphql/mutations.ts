@@ -68,3 +68,17 @@ export const WITHDRAW = gql`
     }
   }
 `;
+
+export const PLACE_PARLAY = gql`
+  mutation PlaceParlay($input: PlaceParlayInput!) {
+    placeParlay(input: $input) {
+      id
+      userId
+      totalStake
+      combinedOdds
+      potentialPayout
+      status
+      createdAt
+    }
+  }
+`;

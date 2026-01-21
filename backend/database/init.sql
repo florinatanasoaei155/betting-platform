@@ -85,3 +85,32 @@ CREATE INDEX idx_bets_user_id ON bets(user_id);
 CREATE INDEX idx_bets_selection_id ON bets(selection_id);
 CREATE INDEX idx_bets_status ON bets(status);
 CREATE INDEX idx_bets_created_at ON bets(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS parlay_bets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    total_stake DECIMAL(12, 2) NOT NULL CHECK (total_stake > 0),
+    combined_odds DECIMAL(10, 4) NOT NULL CHECK (combined_odds > 1.0),
+    potential_payout DECIMAL(12, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'won', 'lost', 'partially_void', 'void')),
+    settled_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_parlay_bets_user_id ON parlay_bets(user_id);
+CREATE INDEX idx_parlay_bets_status ON parlay_bets(status);
+CREATE INDEX idx_parlay_bets_created_at ON parlay_bets(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS parlay_legs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    parlay_id UUID NOT NULL REFERENCES parlay_bets(id) ON DELETE CASCADE,
+    selection_id UUID NOT NULL REFERENCES selections(id),
+    odds_at_placement DECIMAL(8, 2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'won', 'lost', 'void')),
+    leg_number INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_parlay_legs_parlay_id ON parlay_legs(parlay_id);
+CREATE INDEX idx_parlay_legs_selection_id ON parlay_legs(selection_id);
+CREATE INDEX idx_parlay_legs_status ON parlay_legs(status);

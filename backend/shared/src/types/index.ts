@@ -94,6 +94,8 @@ export interface MarketWithSelections extends Market {
 }
 
 export type BetStatus = 'pending' | 'won' | 'lost' | 'void' | 'cashed_out';
+export type ParlayStatus = 'pending' | 'won' | 'lost' | 'partially_void' | 'void';
+export type ParlayLegStatus = 'pending' | 'won' | 'lost' | 'void';
 
 export interface Bet {
   id: string;
@@ -115,6 +117,54 @@ export interface BetWithDetails extends Bet {
   selection: Selection;
   market: Market;
   event: SportEvent;
+}
+
+export interface ParlayLeg {
+  id: string;
+  parlay_id: string;
+  selection_id: string;
+  odds_at_placement: number;
+  status: ParlayLegStatus;
+  leg_number: number;
+  created_at: Date;
+}
+
+export interface ParlayLegWithDetails extends ParlayLeg {
+  selection: Selection;
+  market: Market;
+  event: SportEvent;
+}
+
+export interface ParlayBet {
+  id: string;
+  user_id: string;
+  total_stake: number;
+  combined_odds: number;
+  potential_payout: number;
+  status: ParlayStatus;
+  settled_at?: Date;
+  created_at: Date;
+}
+
+export interface ParlayBetWithLegs extends ParlayBet {
+  legs: ParlayLegWithDetails[];
+}
+
+export interface PlaceParlayRequest {
+  selections: { selection_id: string }[];
+  stake: number;
+}
+
+export interface ParlayPlacedEvent {
+  type: 'PARLAY_PLACED';
+  payload: {
+    parlay_id: string;
+    user_id: string;
+    selections: string[];
+    stake: number;
+    combined_odds: number;
+    timestamp: Date;
+  };
 }
 
 export interface BetPlacedEvent {
@@ -149,7 +199,7 @@ export interface EventStatusChangedEvent {
   };
 }
 
-export type QueueEvent = BetPlacedEvent | OddsUpdatedEvent | EventStatusChangedEvent;
+export type QueueEvent = BetPlacedEvent | OddsUpdatedEvent | EventStatusChangedEvent | ParlayPlacedEvent;
 
 export interface ApiResponse<T> {
   success: boolean;

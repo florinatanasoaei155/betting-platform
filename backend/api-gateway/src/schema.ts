@@ -28,6 +28,21 @@ export const typeDefs = `#graphql
     cashed_out
   }
 
+  enum ParlayStatus {
+    pending
+    won
+    lost
+    partially_void
+    void
+  }
+
+  enum ParlayLegStatus {
+    pending
+    won
+    lost
+    void
+  }
+
   type User {
     id: ID!
     email: String!
@@ -108,6 +123,31 @@ export const typeDefs = `#graphql
     timestamp: String!
   }
 
+  type ParlayLeg {
+    id: ID!
+    parlayId: ID!
+    selectionId: ID!
+    oddsAtPlacement: Float!
+    status: ParlayLegStatus!
+    legNumber: Int!
+    createdAt: String!
+    selection: Selection!
+    market: Market!
+    event: Event!
+  }
+
+  type ParlayBet {
+    id: ID!
+    userId: ID!
+    totalStake: Float!
+    combinedOdds: Float!
+    potentialPayout: Float!
+    status: ParlayStatus!
+    settledAt: String
+    createdAt: String!
+    legs: [ParlayLeg!]!
+  }
+
   input RegisterInput {
     email: String!
     username: String!
@@ -124,6 +164,15 @@ export const typeDefs = `#graphql
     stake: Float!
   }
 
+  input ParlaySelectionInput {
+    selectionId: ID!
+  }
+
+  input PlaceParlayInput {
+    selections: [ParlaySelectionInput!]!
+    stake: Float!
+  }
+
   type Query {
     # User
     me: User
@@ -135,6 +184,10 @@ export const typeDefs = `#graphql
     # Bets
     myBets(status: BetStatus, limit: Int, offset: Int): [Bet!]!
     bet(id: ID!): Bet
+
+    # Parlays
+    myParlays(status: ParlayStatus, limit: Int, offset: Int): [ParlayBet!]!
+    parlay(id: ID!): ParlayBet
 
     # Wallet
     wallet: Wallet
@@ -149,6 +202,7 @@ export const typeDefs = `#graphql
 
     # Betting
     placeBet(input: PlaceBetInput!): Bet!
+    placeParlay(input: PlaceParlayInput!): ParlayBet!
 
     # Wallet
     deposit(amount: Float!): Wallet!

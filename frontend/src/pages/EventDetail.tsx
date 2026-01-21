@@ -48,6 +48,7 @@ export function EventDetail() {
       selectionId: selection.id,
       selectionName: selection.name,
       odds: selection.odds,
+      eventId: event.id,
       eventName: event.name,
       marketName: market.name,
     });

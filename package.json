@@ -26,7 +26,10 @@
     "docker:dev:logs": "docker compose --profile dev logs -f frontend",
     "docker:clean": "bash scripts/cleanup.sh",
     "clean": "rm -rf node_modules frontend/node_modules backend/*/node_modules backend/shared/dist frontend/dist",
-    "db:seed": "npx tsx backend/database/seed.ts"
+    "db:seed": "npx tsx backend/database/seed.ts",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "npm run test -w frontend --if-present",
+    "test:e2e": "npm run test:e2e -w frontend --if-present"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

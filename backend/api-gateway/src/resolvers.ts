@@ -179,6 +179,60 @@ export const resolvers = {
         return [];
       }
     },
+
+    myParlays: async (_: unknown, args: { status?: string; limit?: number; offset?: number }, context: Context) => {
+      requireAuth(context);
+      try {
+        const params = new URLSearchParams();
+        if (args.status) params.append('status', args.status);
+        if (args.limit) params.append('limit', args.limit.toString());
+        if (args.offset) params.append('offset', args.offset.toString());
+
+        const response = await axios.get(`${BET_SERVICE_URL}/parlays?${params.toString()}`, {
+          headers: { Authorization: `Bearer ${context.token}` },
+        });
+        if (response.data.success) {
+          return response.data.data.map((parlay: Record<string, unknown>) => ({
+            ...toCamelCase(parlay),
+            legs: (parlay.legs as Record<string, unknown>[])?.map((leg: Record<string, unknown>) => ({
+              ...toCamelCase(leg),
+              selection: leg.selection ? toCamelCase(leg.selection as Record<string, unknown>) : null,
+              market: leg.market ? toCamelCase(leg.market as Record<string, unknown>) : null,
+              event: leg.event ? toCamelCase(leg.event as Record<string, unknown>) : null,
+            })),
+          }));
+        }
+        return [];
+      } catch (error) {
+        console.error('Error fetching parlays:', error);
+        return [];
+      }
+    },
+
+    parlay: async (_: unknown, args: { id: string }, context: Context) => {
+      requireAuth(context);
+      try {
+        const response = await axios.get(`${BET_SERVICE_URL}/parlays/${args.id}`, {
+          headers: { Authorization: `Bearer ${context.token}` },
+        });
+        if (response.data.success) {
+          const parlay = response.data.data;
+          return {
+            ...toCamelCase(parlay),
+            legs: parlay.legs?.map((leg: Record<string, unknown>) => ({
+              ...toCamelCase(leg),
+              selection: leg.selection ? toCamelCase(leg.selection as Record<string, unknown>) : null,
+              market: leg.market ? toCamelCase(leg.market as Record<string, unknown>) : null,
+              event: leg.event ? toCamelCase(leg.event as Record<string, unknown>) : null,
+            })),
+          };
+        }
+        return null;
+      } catch (error) {
+        console.error('Error fetching parlay:', error);
+        return null;
+      }
+    },
   },
 
   Mutation: {
@@ -271,6 +325,39 @@ export const resolvers = {
           });
         }
         throw new GraphQLError('Failed to place bet', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        });
+      }
+    },
+
+    placeParlay: async (
+      _: unknown,
+      args: { input: { selections: { selectionId: string }[]; stake: number } },
+      context: Context
+    ) => {
+      requireAuth(context);
+      try {
+        const response = await axios.post(
+          `${BET_SERVICE_URL}/parlays`,
+          {
+            selections: args.input.selections.map((s) => ({ selection_id: s.selectionId })),
+            stake: args.input.stake,
+          },
+          { headers: { Authorization: `Bearer ${context.token}` } }
+        );
+        if (response.data.success) {
+          return toCamelCase(response.data.data);
+        }
+        throw new GraphQLError(response.data.error || 'Failed to place parlay', {
+          extensions: { code: 'BAD_USER_INPUT' },
+        });
+      } catch (error: unknown) {
+        if (axios.isAxiosError(error) && error.response?.data?.error) {
+          throw new GraphQLError(error.response.data.error, {
+            extensions: { code: 'BAD_USER_INPUT' },
+          });
+        }
+        throw new GraphQLError('Failed to place parlay', {
           extensions: { code: 'INTERNAL_SERVER_ERROR' },
         });
       }

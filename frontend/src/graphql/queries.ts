@@ -110,3 +110,44 @@ export const GET_MY_BETS = gql`
     }
   }
 `;
+
+export const GET_MY_PARLAYS = gql`
+  query GetMyParlays($status: ParlayStatus, $limit: Int, $offset: Int) {
+    myParlays(status: $status, limit: $limit, offset: $offset) {
+      id
+      userId
+      totalStake
+      combinedOdds
+      potentialPayout
+      status
+      settledAt
+      createdAt
+      legs {
+        id
+        parlayId
+        selectionId
+        oddsAtPlacement
+        status
+        legNumber
+        createdAt
+        selection {
+          id
+          name
+          odds
+        }
+        market {
+          id
+          name
+          type
+        }
+        event {
+          id
+          name
+          sport
+          startTime
+          status
+        }
+      }
+    }
+  }
+`;
