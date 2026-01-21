@@ -18,7 +18,7 @@ export function renderWithProviders(
 ) {
   function Wrapper({ children }: WrapperProps) {
     return (
-      <MockedProvider mocks={mocks} addTypename={false}>
+      <MockedProvider mocks={mocks}>
         <BrowserRouter>{children}</BrowserRouter>
       </MockedProvider>
     );

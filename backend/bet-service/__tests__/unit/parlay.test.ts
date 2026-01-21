@@ -62,7 +62,7 @@ describe('Parlay Odds Calculation', () => {
 
     it('should handle decimal odds correctly', () => {
       const result = calculateCombinedOdds([1.91, 2.05, 1.87]);
-      expect(result).toBeCloseTo(7.33, 2);
+      expect(result).toBeCloseTo(7.32, 2);
     });
 
     it('should return 1 for empty odds array', () => {
