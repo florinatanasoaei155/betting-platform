@@ -14,17 +14,21 @@
     "backend/event-service"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "dev": "npm run build:shared && concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build:shared": "npm run build -w shared",
     "dev:frontend": "npm run dev -w frontend",
     "dev:backend": "concurrently \"npm run dev -w api-gateway\" \"npm run dev -w user-service\" \"npm run dev -w wallet-service\" \"npm run dev -w bet-service\" \"npm run dev -w odds-service\" \"npm run dev -w event-service\"",
     "build": "npm run build -ws",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "db:seed": "npx ts-node backend/database/seed.ts"
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:dev": "docker compose --profile dev up -d",
+    "docker:dev:build": "docker compose --profile dev up -d --build",
+    "docker:dev:logs": "docker compose --profile dev logs -f frontend",
+    "db:seed": "npx tsx backend/database/seed.ts"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.3.2"
   },
   "dependencies": {

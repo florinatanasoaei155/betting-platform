@@ -15,17 +15,17 @@ export function EventCard({ id, name, sport, homeTeam, awayTeam, startTime, stat
   const isLive = status === 'live';
 
   const sportIcons: Record<string, string> = {
-    football: 'â\9a\bd',
-    basketball: 'ð\9f\8f\80',
-    tennis: 'ð\9f\8e¾',
-    horse_racing: 'ð\9f\8f\87',
+    football: '\u26BD',
+    basketball: '\uD83C\uDFC0',
+    tennis: '\uD83C\uDFBE',
+    horse_racing: '\uD83C\uDFC7',
   };
 
   return (
     <Link to={`/events/${id}`} className="card hover:bg-gray-800/50 transition-colors block">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
-          <span className="text-xl">{sportIcons[sport] || 'ð\9f\8f\86'}</span>
+          <span className="text-xl">{sportIcons[sport] || '\uD83C\uDFC6'}</span>
           <span className="text-sm text-gray-400 capitalize">{sport.replace('_', ' ')}</span>
         </div>
         {isLive ? (
@@ -51,7 +51,7 @@ export function EventCard({ id, name, sport, homeTeam, awayTeam, startTime, stat
 
       <div className="mt-4 text-right">
         <span className="text-betting-accent text-sm hover:underline">
-          View Markets â\86\92
+          View Markets &rarr;
         </span>
       </div>
     </Link>

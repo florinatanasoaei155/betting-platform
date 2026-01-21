@@ -1,7 +1,7 @@
-import amqp, { Channel, Connection } from 'amqplib';
+import amqp, { ChannelModel, Channel } from 'amqplib';
 import { QueueEvent } from '../types';
 
-let connection: Connection | null = null;
+let connection: ChannelModel | null = null;
 let channel: Channel | null = null;
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://betting:betting123@localhost:5672';

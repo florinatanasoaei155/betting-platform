@@ -12,7 +12,35 @@ import {
   ApiResponse,
   publishEvent,
   connectRabbitMQ,
+  BetStatus,
+  Sport,
+  EventStatus,
+  MarketStatus,
 } from 'shared';
+
+// Database row type for bet queries with joins
+interface BetQueryRow {
+  id: string;
+  user_id: string;
+  selection_id: string;
+  stake: number;
+  odds_at_placement: number;
+  status: BetStatus;
+  potential_payout: number;
+  created_at: Date;
+  selection_name: string;
+  current_odds: number;
+  market_id: string;
+  market_name: string;
+  market_type: string;
+  event_id: string;
+  event_name: string;
+  sport: Sport;
+  start_time: Date;
+  event_status: EventStatus;
+  home_team?: string;
+  away_team?: string;
+}
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -213,7 +241,7 @@ app.get('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
 
     const result = await query(queryText, params);
 
-    const bets: BetWithDetails[] = result.rows.map((row) => ({
+    const bets: BetWithDetails[] = (result.rows as BetQueryRow[]).map((row) => ({
       id: row.id,
       user_id: row.user_id,
       selection_id: row.selection_id,
@@ -233,14 +261,14 @@ app.get('/bets', authMiddleware, async (req: AuthenticatedRequest, res) => {
         event_id: row.event_id,
         name: row.market_name,
         type: row.market_type,
-        status: 'open', // Default, could be fetched
+        status: 'open' as MarketStatus,
       },
       event: {
         id: row.event_id,
         sport: row.sport,
         name: row.event_name,
-        home_team: '',
-        away_team: '',
+        home_team: row.home_team || '',
+        away_team: row.away_team || '',
         start_time: row.start_time,
         status: row.event_status,
         created_at: row.created_at,
